@@ -9,7 +9,7 @@ const TodoList = ({ todos, toggleTodo }) => (
       <Todo
         key={todo.id}
         {...todo}
-        onClick={todo.toggleTodo.bind(todo)}
+        onClick={() => todo.update({ completed: !todo.completed })}
       />
     ))}
   </ul>

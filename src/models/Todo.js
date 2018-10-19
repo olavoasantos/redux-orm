@@ -13,10 +13,6 @@ class Todo extends BaseModel {
       completed: false,
     }
   }
-
-  toggleTodo() {
-    this.update({ completed: !this.completed });
-  }
 }
 
 export default Todo;
