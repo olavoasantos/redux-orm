@@ -12,6 +12,17 @@ class BaseModel {
 
   static $actions() {
     return {
+      ...this.$baseActions(),
+      ...this.$defineActions(),
+    };
+  }
+
+  get $actions() {
+    return this.constructor.$actions;
+  }
+
+  static $baseActions() {
+    return {
       WILL_CREATE: `@@eloquent_redux_${this.$store}_will_create`,
       CREATE: `@@eloquent_redux_${this.$store}_create`,
       CREATED: `@@eloquent_redux_${this.$store}_created`,
@@ -20,17 +31,33 @@ class BaseModel {
       UPDATED: `@@eloquent_redux_${this.$store}_updated`,
       WILL_DELETE: `@@eloquent_redux_${this.$store}_will_delete`,
       DELETE: `@@eloquent_redux_${this.$store}_delete`,
-      DELETED: `@@eloquent_redux_${this.$store}_deleted`,
+      DELETED: `@@eloquent_redux_${this.$store}_deleted`
     };
   }
 
-  get $actions() {
-    return this.constructor.$actions;
+  get $baseActions() {
+    return this.constructor.$baseActions;
+  }
+
+  static $defineActions() {
+    return {};
+  }
+
+  get $defineActions() {
+    return this.constructor.$defineActions;
   }
 
   static $initialState = {
-    list: [],
+    list: []
   };
+
+  static $stateList() {
+    return this.$state.list;
+  }
+
+  get $stateList() {
+    return this.constructor.$stateList;
+  }
 
   static $reducer() {
     this.$basicHandlers();
@@ -46,32 +73,32 @@ class BaseModel {
     this.$addHandler(
       this.$actions(this.$store).CREATE,
       function(state, action) {
-        this.willCreate(state, action)
-        state = this.creating(state, action)
+        this.willCreate(state, action);
+        state = this.creating(state, action);
         this.created(state, action);
 
         return state;
-      }.bind(this),
+      }.bind(this)
     );
     this.$addHandler(
       this.$actions(this.$store).UPDATE,
       function(state, action) {
-        this.willUpdate(state, action)
-        state = this.updating(state, action)
+        this.willUpdate(state, action);
+        state = this.updating(state, action);
         this.updated(state, action);
 
         return state;
-      }.bind(this),
+      }.bind(this)
     );
     this.$addHandler(
       this.$actions(this.$store).DELETE,
       function(state, action) {
-        this.willDelete(state, action)
-        state = this.deleting(state, action)
+        this.willDelete(state, action);
+        state = this.deleting(state, action);
         this.deleted(state, action);
 
         return state;
-      }.bind(this),
+      }.bind(this)
     );
   }
 
@@ -121,52 +148,82 @@ class BaseModel {
 
   static all(...args) {
     const { field, operator, value } = FieldOperatorValue(...args);
-    return this.$state.list.filter(
-        item => (field ? Operators[operator](item[field], value) : true),
-      )
-      .map(item => new this(item));
+    return this.$stateList()
+      .filter(item => (field ? Operators[operator](item[field], value) : true));
   }
 
   static find(...args) {
     const { field, operator, value } = FieldOperatorValue(...args);
-    if (!Operators[operator]) throw new Error('invalid find operator');
     if (field == null) throw new Error('field in find method is required');
-    const item = this.$state.list.find(item => Operators[operator](item[field], value));
-
-    return item ? new this(item) : undefined;
+    return this.$stateList().find(item =>
+      Operators[operator](item[field], value)
+    );
   }
 
-  constructor(data) {
+  static create(data) {
+    const defaults = this.$defaults();
+    const payload = this.$fields.reduce((model, field) => {
+      return typeof field === 'string'
+        ? {
+            ...model,
+            [field]: data[field] !== undefined ? data[field] : defaults[field]
+          }
+        : { ...model, [field.name]: data[field.name] };
+    }, {});
+
+    const item = new this(payload);
+
+    this.$dispatch({
+      payload: item,
+      type: this.$actions().CREATE
+    });
+
+    return item;
+  }
+
+  constructor(data = {}) {
+    this.$defineFields();
     this.$hydrate(data);
+  }
+
+  $data = {};
+
+  $defineFields() {
+    this.$fields.forEach(
+      field => {
+        const attribute = (typeof field === 'object') ? field.name : field;
+        Object.defineProperty(this, attribute, {
+          get: () => {
+            return this.$data[attribute];
+          },
+          set: (value) => {
+            this.$data[attribute] = value;
+            return this.$data[attribute];
+          },
+        });
+      }
+    );
   }
 
   $mapFieldsFrom(data) {
     return this.$fields.map(field => {
       if (typeof field === 'object') {
-        if (field.validate && !field.validate(data[field])) {
+        if (field.validate && !field.validate(data[field.name])) {
           throw new Error(
-            `Invalid value "${data[field]}" of field ${field.name}`,
+            `Invalid value "${data[field]}" of field ${field.name}`
           );
         }
-        return { name: field.name, value: data[field.name] };
+        field = field.name;
       }
 
-      return { name: field, value: data[field] };
+      return { name: field, value: data[field] != null ? data[field] : this.$defaults()[field] };
     });
   }
 
   $hydrate(data) {
     this.$mapFieldsFrom(data).forEach(
-      attribute => (this[attribute.name] = attribute.value),
+      attribute => (this[attribute.name] = attribute.value)
     );
-  }
-
-  $data() {
-    return this.$fields.reduce((data, field) => {
-      return typeof field === 'string'
-        ? { ...data, [field]: this[field] }
-        : { ...data, [field.name]: this[field.name] };
-    }, {});
   }
 
   create() {
@@ -175,27 +232,31 @@ class BaseModel {
       return typeof field === 'string'
         ? {
             ...data,
-            [field]: this[field] !== undefined ? this[field] : defaults[field] }
+            [field]: this[field] !== undefined ? this[field] : defaults[field]
+          }
         : { ...data, [field.name]: this[field.name] };
     }, {});
+
     this.$dispatch({
-      payload,
-      type: this.$actions().CREATE,
+      payload: new this.constructor(payload),
+      type: this.$actions().CREATE
     });
   }
 
   update(data = {}) {
+    const payload = {
+      ...this.$data,
+      ...this.$mapFieldsFrom(data).reduce(($data, attribute) => {
+        return attribute.value === undefined
+          ? $data
+          : { ...$data, [attribute.name]: attribute.value };
+      }, {})
+    };
+
     this.$dispatch({
       type: this.$actions().UPDATE,
       reference: this[this.$referencedBy],
-      payload: {
-        ...this.$data(),
-        ...this.$mapFieldsFrom(data).reduce(($data, attribute) => {
-          return attribute.value === undefined
-            ? $data
-            : { ...$data, [attribute.name]: attribute.value };
-        }, {}),
-      },
+      payload: new this.constructor(payload)
     });
   }
 
@@ -204,7 +265,7 @@ class BaseModel {
   static creating(state, action) {
     return {
       ...state,
-      list: [...state.list, action.payload],
+      list: [...state.list, action.payload]
     };
   }
 
@@ -217,7 +278,7 @@ class BaseModel {
       ...state,
       list: state.list.map(item => {
         return item[this.$referencedBy] === action.reference
-          ? { ...item, ...action.payload }
+          ? action.payload
           : item;
       }),
     };
@@ -231,8 +292,8 @@ class BaseModel {
     return {
       ...state,
       list: state.list.filter(
-        item => item[this.$referencedBy] === action.reference,
-      ),
+        item => item[this.$referencedBy] === action.reference
+      )
     };
   }
 

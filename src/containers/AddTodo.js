@@ -10,10 +10,10 @@ const AddTodo = ({ dispatch }) => {
       <form
         onSubmit={e => {
           e.preventDefault();
-          if (!input.value.trim()) {
-            return;
-          }
-          new Todo({ text: input.value }).create();
+          if (!input.value.trim()) return;
+
+          Todo.create({ text: input.value });
+
           input.value = "";
         }}
       >
