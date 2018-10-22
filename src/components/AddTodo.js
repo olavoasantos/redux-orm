@@ -1,5 +1,4 @@
-import React from "react";
-import { connect } from "react-redux";
+import React from 'react';
 import Todo from '../models/Todo';
 
 const AddTodo = () => {
@@ -14,7 +13,7 @@ const AddTodo = () => {
 
           Todo.create({ text: input.value });
 
-          input.value = "";
+          input.value = '';
         }}
       >
         <input ref={node => (input = node)} />
@@ -24,4 +23,4 @@ const AddTodo = () => {
   );
 };
 
-export default connect()(AddTodo);
+export default AddTodo;
