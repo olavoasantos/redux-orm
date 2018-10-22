@@ -2,7 +2,7 @@ import React from "react";
 import { connect } from "react-redux";
 import Todo from '../models/Todo';
 
-const AddTodo = ({ dispatch }) => {
+const AddTodo = () => {
   let input;
 
   return (

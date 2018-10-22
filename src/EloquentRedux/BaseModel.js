@@ -10,11 +10,12 @@ class BaseModel {
     return this.constructor.$store;
   }
 
-  static $actions() {
-    return {
+  static $actions(name) {
+    const actions = {
       ...this.$baseActions(),
       ...this.$defineActions(),
     };
+    return name ? actions[name] : actions;
   }
 
   get $actions() {
@@ -71,7 +72,7 @@ class BaseModel {
 
   static $basicHandlers() {
     this.$addHandler(
-      this.$actions(this.$store).CREATE,
+      this.$actions().CREATE,
       function(state, action) {
         this.willCreate(state, action);
         state = this.creating(state, action);
@@ -81,7 +82,7 @@ class BaseModel {
       }.bind(this)
     );
     this.$addHandler(
-      this.$actions(this.$store).UPDATE,
+      this.$actions().UPDATE,
       function(state, action) {
         this.willUpdate(state, action);
         state = this.updating(state, action);
@@ -91,7 +92,7 @@ class BaseModel {
       }.bind(this)
     );
     this.$addHandler(
-      this.$actions(this.$store).DELETE,
+      this.$actions().DELETE,
       function(state, action) {
         this.willDelete(state, action);
         state = this.deleting(state, action);
@@ -132,14 +133,6 @@ class BaseModel {
     return this.constructor.$fields;
   }
 
-  static $defaults() {
-    return {};
-  }
-
-  get $defaults() {
-    return this.constructor.$defaults;
-  }
-
   static $referencedBy = 'id';
 
   get $referencedBy() {
@@ -162,7 +155,7 @@ class BaseModel {
 
   static create(data) {
     const defaults = this.$defaults();
-    const payload = this.$fields.reduce((model, field) => {
+    const payload = this.$fields().reduce((model, field) => {
       return typeof field === 'string'
         ? {
             ...model,
@@ -188,27 +181,10 @@ class BaseModel {
 
   $data = {};
 
-  $defineFields() {
-    this.$fields.forEach(
-      field => {
-        const attribute = (typeof field === 'object') ? field.name : field;
-        Object.defineProperty(this, attribute, {
-          get: () => {
-            return this.$data[attribute];
-          },
-          set: (value) => {
-            this.$data[attribute] = value;
-            return this.$data[attribute];
-          },
-        });
-      }
-    );
-  }
-
   $mapFieldsFrom(data) {
-    return this.$fields.map(field => {
+    return this.$fields().map(field => {
       if (typeof field === 'object') {
-        if (field.validate && !field.validate(data[field.name])) {
+        if (field.validation && !field.validation(data[field.name])) {
           throw new Error(
             `Invalid value "${data[field]}" of field ${field.name}`
           );
@@ -228,7 +204,7 @@ class BaseModel {
 
   create() {
     const defaults = this.$defaults();
-    const payload = this.$fields.reduce((data, field) => {
+    const payload = this.$fields().reduce((data, field) => {
       return typeof field === 'string'
         ? {
             ...data,
@@ -244,14 +220,11 @@ class BaseModel {
   }
 
   update(data = {}) {
-    const payload = {
-      ...this.$data,
-      ...this.$mapFieldsFrom(data).reduce(($data, attribute) => {
-        return attribute.value === undefined
-          ? $data
-          : { ...$data, [attribute.name]: attribute.value };
-      }, {})
-    };
+    const payload = this.$mapFieldsFrom({ ...this.$data, ...data}).reduce(($data, attribute) => {
+      return attribute.value === undefined
+        ? $data
+        : { ...$data, [attribute.name]: attribute.value };
+    }, {});
 
     this.$dispatch({
       type: this.$actions().UPDATE,
@@ -298,6 +271,34 @@ class BaseModel {
   }
 
   static deleted(state, action) {}
+}
+
+BaseModel.prototype.$defineFields = function() {
+  this.$fields().forEach(
+    field => {
+      const attribute = (typeof field === 'object') ? field.name : field;
+      Object.defineProperty(this, attribute, {
+        get: () => {
+          return this.$data[attribute];
+        },
+        set: (value) => {
+          this.$data[attribute] = value;
+          return this.$data[attribute];
+        },
+      });
+    }
+  );
+}
+
+BaseModel.prototype.$defaults = BaseModel.$defaults = function() {
+  return this.$fields().reduce((defaults, field) => {
+    if (
+      typeof field === 'string' ||
+      field.default == null
+    ) return defaults;
+
+    return { ...defaults, [field.name]: field.default };
+  }, {});
 }
 
 export default BaseModel;

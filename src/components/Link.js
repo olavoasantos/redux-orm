@@ -1,10 +1,12 @@
 import React from "react";
 import PropTypes from "prop-types";
 
-const Link = ({ active, children, onClick }) => (
+import Todo from '../models/Todo';
+
+const Link = ({ children, active, filter }) => (
   <button
-    onClick={onClick}
-    disabled={active}
+    disabled={active === filter}
+    onClick={() => Todo.setFilter(filter)}
     style={{
       marginLeft: "4px"
     }}
@@ -14,9 +16,7 @@ const Link = ({ active, children, onClick }) => (
 );
 
 Link.propTypes = {
-  active: PropTypes.bool.isRequired,
   children: PropTypes.node.isRequired,
-  onClick: PropTypes.func.isRequired
 };
 
 export default Link;
