@@ -23,9 +23,6 @@ const Eloquent = (() => {
 
       return reduxStore;
     },
-    setStore: redux => {
-      reduxStore = redux;
-    },
     store: () => reduxStore
   };
 })();

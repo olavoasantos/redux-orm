@@ -3,9 +3,9 @@ import PropTypes from "prop-types";
 
 import Todo from '../models/Todo';
 
-const Link = ({ children, active, filter }) => (
+const Link = ({ children, activeFilter, filter }) => (
   <button
-    disabled={active === filter}
+    disabled={activeFilter === filter}
     onClick={() => Todo.setFilter(filter)}
     style={{
       marginLeft: "4px"
