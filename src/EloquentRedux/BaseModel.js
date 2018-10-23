@@ -127,7 +127,9 @@ class BaseModel {
     return this.constructor.$state;
   }
 
-  static $fields = [];
+  static $fields() {
+    return [];
+  }
 
   get $fields() {
     return this.constructor.$fields;
@@ -137,6 +139,21 @@ class BaseModel {
 
   get $referencedBy() {
     return this.constructor.$referencedBy;
+  }
+
+  static $defaults() {
+    return this.$fields().reduce((defaults, field) => {
+      if (
+        typeof field === 'string' ||
+        field.default == null
+      ) return defaults;
+
+      return { ...defaults, [field.name]: field.default };
+    }, {});
+  }
+
+  get $defaults() {
+    return this.constructor.$defaults;
   }
 
   static all(...args) {
@@ -180,6 +197,23 @@ class BaseModel {
   }
 
   $data = {};
+
+  $defineFields() {
+    this.$fields().forEach(
+      field => {
+        const attribute = (typeof field === 'object') ? field.name : field;
+        Object.defineProperty(this, attribute, {
+          get: () => {
+            return this.$data[attribute];
+          },
+          set: (value) => {
+            this.$data[attribute] = value;
+            return this.$data[attribute];
+          },
+        });
+      }
+    );
+  }
 
   $mapFieldsFrom(data) {
     return this.$fields().map(field => {
@@ -271,34 +305,6 @@ class BaseModel {
   }
 
   static deleted(state, action) {}
-}
-
-BaseModel.prototype.$defineFields = function() {
-  this.$fields().forEach(
-    field => {
-      const attribute = (typeof field === 'object') ? field.name : field;
-      Object.defineProperty(this, attribute, {
-        get: () => {
-          return this.$data[attribute];
-        },
-        set: (value) => {
-          this.$data[attribute] = value;
-          return this.$data[attribute];
-        },
-      });
-    }
-  );
-}
-
-BaseModel.prototype.$defaults = BaseModel.$defaults = function() {
-  return this.$fields().reduce((defaults, field) => {
-    if (
-      typeof field === 'string' ||
-      field.default == null
-    ) return defaults;
-
-    return { ...defaults, [field.name]: field.default };
-  }, {});
 }
 
 export default BaseModel;
